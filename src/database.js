@@ -163,7 +163,7 @@ function getPendingOrders() {
 
 function getOrdersByUser(userId) {
   const result = db.exec(`
-    SELECT o.id, o.status, p.name as product_name, p.price
+    SELECT o.id, o.status, p.name as product_name, o.total_price
     FROM orders o
     JOIN products p ON o.product_id = p.id
     WHERE o.user_id = ${userId}
@@ -171,7 +171,7 @@ function getOrdersByUser(userId) {
   `);
   if (!result.length) return [];
   return result[0].values.map(row => ({
-    id: row[0], status: row[1], product_name: row[2], price: row[3]
+    id: row[0], status: row[1], product_name: row[2], price: row[3] || 0
   }));
 }
 
@@ -204,29 +204,27 @@ module.exports = {
   // Lịch sử mua hàng chi tiết
   getOrderHistory: (userId) => {
     const result = db.exec(`
-      SELECT o.id, o.status, p.name, p.price, s.account_data
+      SELECT o.id, o.status, p.name, o.total_price, o.quantity, o.created_at
       FROM orders o
       JOIN products p ON o.product_id = p.id
-      LEFT JOIN stock s ON o.stock_id = s.id
-      WHERE o.user_id = ${userId}
+      WHERE o.user_id = ${userId} AND o.status IN ('completed', 'pending', 'expired', 'cancelled')
       ORDER BY o.id DESC
       LIMIT 20
     `);
     if (!result.length) return [];
     return result[0].values.map(row => ({ 
-      id: row[0], status: row[1], product_name: row[2], price: row[3], account_data: row[4] 
+      id: row[0], status: row[1], product_name: row[2], total_price: row[3], quantity: row[4], created_at: row[5]
     }));
   },
   
   // Thống kê doanh thu
   getRevenue: () => {
-    const today = new Date().toISOString().split('T')[0];
     const result = db.exec(`
       SELECT 
-        COUNT(CASE WHEN o.status = 'completed' THEN 1 END) as total_orders,
-        SUM(CASE WHEN o.status = 'completed' THEN p.price ELSE 0 END) as total_revenue
-      FROM orders o
-      JOIN products p ON o.product_id = p.id
+        COUNT(*) as total_orders,
+        SUM(total_price) as total_revenue
+      FROM orders
+      WHERE status = 'completed'
     `);
     if (!result.length || !result[0].values.length) return { total_orders: 0, total_revenue: 0 };
     return { total_orders: result[0].values[0][0] || 0, total_revenue: result[0].values[0][1] || 0 };
@@ -235,7 +233,7 @@ module.exports = {
   // Danh sách đơn hàng gần đây (admin)
   getRecentOrders: (limit = 20) => {
     const result = db.exec(`
-      SELECT o.id, o.user_id, o.status, p.name, p.price, u.first_name
+      SELECT o.id, o.user_id, o.status, p.name, o.total_price, o.quantity, u.first_name, o.created_at
       FROM orders o
       JOIN products p ON o.product_id = p.id
       LEFT JOIN users u ON o.user_id = u.id
@@ -244,7 +242,7 @@ module.exports = {
     `);
     if (!result.length) return [];
     return result[0].values.map(row => ({ 
-      id: row[0], user_id: row[1], status: row[2], product_name: row[3], price: row[4], user_name: row[5] || 'Unknown'
+      id: row[0], user_id: row[1], status: row[2], product_name: row[3], total_price: row[4], quantity: row[5] || 1, user_name: row[6] || 'Unknown', created_at: row[7]
     }));
   }
 };

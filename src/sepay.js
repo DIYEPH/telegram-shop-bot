@@ -6,7 +6,6 @@ async function getTransactions() {
       headers: { 'Authorization': `Bearer ${config.SEPAY_API_KEY}` }
     });
     const data = await response.json();
-    console.log('SePay response:', JSON.stringify(data, null, 2));
     return data.transactions || [];
   } catch (e) {
     console.log('SePay error:', e.message);
