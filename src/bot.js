@@ -67,19 +67,33 @@ async function startBot() {
   bot.on('polling_error', (err) => console.log('Polling error:', err.message));
 
   setInterval(async () => {
+    if (pendingOrders.size === 0) return; 
+    
     const now = Date.now();
+    
+    // Lấy transactions 1 LẦN DUY NHẤT
+    const transactions = await sepay.getTransactions();
+    
     for (const [orderId, order] of pendingOrders) {
       if (processingOrders.has(orderId)) continue;
       
+      // Check timeout
       if (now - order.createdAt > ORDER_TIMEOUT_MS) {
         pendingOrders.delete(orderId);
         db.updateOrder(orderId, null, 'expired');
         bot.sendMessage(order.chatId, '✖️ Đơn #' + orderId + ' đã hết hạn do không thanh toán trong 20 phút.\n\n⚡ Mua lại? Gõ /menu');
         continue;
       }
+      
       processingOrders.add(orderId);
       
-      const paid = await sepay.checkPayment(order.content, order.totalPrice);
+      // Check payment từ transactions đã lấy (không gọi API thêm)
+      const paid = transactions.find(t => {
+        const transContent = (t.transaction_content || t.content || t.description || '').toUpperCase();
+        const transAmount = parseInt(t.amount_in || t.amount || 0);
+        return transContent.includes(order.content.toUpperCase()) && transAmount >= order.totalPrice;
+      });
+      
       if (paid) {
         pendingOrders.delete(orderId);
         const product = db.getProduct(order.productId);
@@ -104,7 +118,6 @@ async function startBot() {
         }
       }
       
-      // Unlock sau khi xong
       processingOrders.delete(orderId);
     }
   }, 30000);
