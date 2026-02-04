@@ -70,14 +70,10 @@ async function startBot() {
     if (pendingOrders.size === 0) return; 
     
     const now = Date.now();
-    
-    // Lấy transactions 1 LẦN DUY NHẤT
     const transactions = await sepay.getTransactions();
     
     for (const [orderId, order] of pendingOrders) {
       if (processingOrders.has(orderId)) continue;
-      
-      // Check timeout
       if (now - order.createdAt > ORDER_TIMEOUT_MS) {
         pendingOrders.delete(orderId);
         db.updateOrder(orderId, null, 'expired');
@@ -87,7 +83,6 @@ async function startBot() {
       
       processingOrders.add(orderId);
       
-      // Check payment từ transactions đã lấy (không gọi API thêm)
       const paid = transactions.find(t => {
         const transContent = (t.transaction_content || t.content || t.description || '').toUpperCase();
         const transAmount = parseInt(t.amount_in || t.amount || 0);
@@ -236,26 +231,22 @@ async function startBot() {
         if (!product) return bot.answerCallbackQuery(query.id, { text: '❄️ Không tồn tại!' });
         const stock = product.stock_count;
         
-        // Tạo nút số lượng thông minh
         const presets = [1, 2, 3, 5, 10];
         const qtyButtons = [];
         presets.forEach(n => {
           if (n <= stock) qtyButtons.push({ text: '『' + n + '』', callback_data: 'qty_' + product.id + '_' + n });
         });
-        // Thêm nút MAX nếu stock > 10
         if (stock > 10) {
           qtyButtons.push({ text: '『MAX:' + stock + '』', callback_data: 'qty_' + product.id + '_' + stock });
         }
         
         const keyboard = [];
-        // Chia nút thành 2 hàng nếu nhiều
         if (qtyButtons.length <= 3) {
           keyboard.push(qtyButtons);
         } else {
           keyboard.push(qtyButtons.slice(0, 3));
           keyboard.push(qtyButtons.slice(3));
         }
-        // Thêm nút nhập SL tùy chỉnh nếu stock > 5
         if (stock > 5) {
           keyboard.push([{ text: '📝 Nhập số lượng khác', callback_data: 'customqty_' + product.id }]);
         }
@@ -270,7 +261,6 @@ async function startBot() {
         bot.editMessageText(text, { chat_id: chatId, message_id: query.message.message_id, reply_markup: { inline_keyboard: keyboard } });
       }
       
-      // Nhập số lượng tùy chỉnh
       if (data.startsWith('customqty_')) {
         const productId = parseInt(data.split('_')[1]);
         const product = db.getProduct(productId);
