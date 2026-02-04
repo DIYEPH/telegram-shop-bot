@@ -1,7 +1,7 @@
 {
-  "name": "telegram-shop-bot",
+  "name": "telegram-bot",
   "version": "1.0.0",
-  "description": "Telegram Shop Bot for selling accounts",
+  "description": "Telegram Shop Bot for Selling Digital Accounts",
   "main": "src/bot.js",
   "scripts": {
     "start": "node src/bot.js",
